@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.venv/
+
+# Model weights
+*.pth
+*.pt
+*.onnx
+*.trt
+*.engine
+
+# Data (too large)
+Anomaly-Dectection/data/
+Anomaly-Dectection/pretrained_models/
+Anomaly-Dectection/experiments/*/results*/
+
+# UV lock
+uv.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Node
+node_modules/
+.next/
+
+# Environment
+.env
+.env.local
+.env.production
