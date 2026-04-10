@@ -1,0 +1,35 @@
+## Fixes Applied for All 6 Issues
+
+### ISSUE-1 (CRITICAL): Callback violates container isolation — FIXED
+Replaced platform callback (Redis/DB/MinIO inside container) with IPC architecture:
+- Container writes to /workspace/ipc/ (local files: loss.jsonl, eval.jsonl, events.jsonl, checkpoint/, should_stop)
+- Worker daemon outside container watches /workspace/ipc/ via inotify, forwards to Redis/DB/MinIO
+- Cancel propagation: worker daemon touches should_stop file
+- Container stays --network=none, full security isolation preserved
+
+### ISSUE-2 (HIGH): Resume flow not wired — FIXED
+- Added `last_checkpoint_path` column to `job_steps` table
+- Resume semantics in Section 3 now explicitly says: if `last_checkpoint_path` exists → resume from checkpoint iteration; if NULL → rerun from 0
+- Worker receives explicit checkpoint path in resume request
+
+### ISSUE-3 (HIGH): "Exact reproducible" claim too strong — FIXED
+- Downgraded to "best-effort resume" — explicitly documents that sample order and augmentations will diverge
+- Added rationale: DataLoader shuffle state + worker-process RNG cannot be captured (PyTorch InfiniteDataloader + num_workers>0)
+- Noted this is standard trade-off in production training systems
+
+### ISSUE-4 (HIGH): Evaluation metric contract inconsistent — FIXED
+- Changed "15 AUC" to "12 AUC" (4 branches × 3 types = 12 fields)
+- Added explicit canonical list with all 12 field names and descriptions
+- DB schema: renamed auc_logical/auc_structural → auc_combined_logical/auc_combined_structural to match callback keys exactly
+- All references (Section 4, 5, 6) now use consistent count and field names
+
+### ISSUE-5 (MEDIUM): Config naming mismatch — FIXED
+- API example now uses imagenet_path: null (not imagenet_penalty: false)
+- Added canonical parameter mapping table (Library ↔ Baseline SALAD) with 16 params
+- Each param marked as: baseline-equivalent, intentional deviation, or extracted from hard-code
+- Documented key deviation: imagenet_path default flipped ON→OFF with rationale
+
+### ISSUE-6 (MEDIUM): Stale "wrapper script" reference — FIXED
+- Section 12 DINO entry rewritten: library uses torch.hub.load_state_dict_from_url(), container bakes weights via TORCH_HOME env var
+- Docker build contract updated with TORCH_HOME=/cache/torch/hub and explicit DINO download during build
+- All wrapper-script language removed

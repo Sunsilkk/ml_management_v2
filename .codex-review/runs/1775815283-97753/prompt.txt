@@ -1,0 +1,10 @@
+## Both Issues Fixed in Round 7
+
+### R7-ISSUE-1: Worker register/config endpoints missing from internal API [ACCEPTED & FIXED]
+Added POST /api/v1/internal/workers/register and GET /api/v1/internal/workers/{name}/config to the Internal Worker Daemon Endpoints table with auth contract (X-Worker-Token) and response shape description.
+
+### R7-ISSUE-2: Retention table uses stale checkpoint path [ACCEPTED & FIXED]
+Updated retention table: training-jobs/{id}/checkpoints/ → training-jobs/{id}/attempts/{attempt_id}/checkpoints/. Added note about stale attempt cleanup after 7 days. Root training-jobs/{id}/ row now mentions includes all attempt subdirs.
+
+## Your Turn
+Re-review. Round 8.

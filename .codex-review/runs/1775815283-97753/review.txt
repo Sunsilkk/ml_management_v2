@@ -1,0 +1,3 @@
+### VERDICT
+- Status: APPROVE
+- Reason: The remaining contract mismatches are resolved. The plan is now internally consistent across execution model, attempt scoping, checkpoint/promotion semantics, dataset validation, retention, worker control-plane APIs, and attempt-aware reads.

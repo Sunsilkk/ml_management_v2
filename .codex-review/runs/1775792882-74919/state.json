@@ -1,0 +1,16 @@
+{
+  "pid": 74940,
+  "pgid": 74940,
+  "watchdog_pid": 74941,
+  "run_id": "1775792882-74919",
+  "state_dir": "/Users/sunsilkk/service/ml_management_v2/.codex-review/runs/1775792882-74919",
+  "working_dir": "/Users/sunsilkk/service/ml_management_v2",
+  "effort": "xhigh",
+  "timeout": 3600,
+  "format": "markdown",
+  "started_at": 1775792882,
+  "thread_id": "019d7577-90d1-7783-b0ae-160176dcf536",
+  "last_line_count": 37,
+  "stall_count": 0,
+  "last_poll_at": 1775793061
+}

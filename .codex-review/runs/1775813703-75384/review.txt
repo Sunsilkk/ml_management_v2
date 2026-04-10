@@ -1,0 +1,17 @@
+### ISSUE-1: Step 4 checkpoint state is still unsafe across attempts
+- Category: correctness
+- Severity: high
+- Problem: `job_steps.last_checkpoint_path` and `durable_checkpoint_iterations` are still stored on one job-step row, while the update rule is `new iteration > current iteration AND attempt_id matches`. On a new Step 4 attempt, the previous attempt’s checkpoint state is not explicitly reset or separated. If the new attempt reruns from iteration 0 or from an earlier checkpoint, new checkpoint uploads can be blocked by the old max iteration, and promotion eligibility can mix old checkpoint state with current-attempt evaluations.
+- Why it matters: Resume/retry can keep stale checkpoint provenance, fail to record new checkpoints correctly, and select the wrong model for promotion.
+- Suggested fix: Make Step 4 checkpoint state explicitly attempt-scoped in the plan, or define a mandatory reset/copy-forward rule when a new attempt starts: keep a separate `resume_source_checkpoint`, clear active-attempt checkpoint state, and evaluate promotion using current-attempt checkpoint metadata only.
+
+### ISSUE-2: Log read semantics are still not attempt-aware
+- Category: architecture
+- Severity: medium
+- Problem: Log writes are now attempt-scoped in Redis and MinIO, but the read side still uses `/training/jobs/{id}/logs` and `/training/jobs/{id}/logs/{step}` without an attempt selector or an explicit rule that reads default to `current_attempt_id`. Historical attempt logs are retained, but the retrieval model for them is not defined.
+- Why it matters: On retried or resumed jobs, the backend cannot unambiguously decide which attempt’s logs to backfill or stream, and retained historical logs are not cleanly addressable for debugging.
+- Suggested fix: Define log read semantics explicitly: live log APIs default to `current_attempt_id`, and historical log APIs accept an optional `attempt_id` for debugging/backfill.
+
+### VERDICT
+- Status: REVISE
+- Reason: The plan is very close, but Step 4 checkpoint state and log retrieval still are not fully coherent under the new multi-attempt model.

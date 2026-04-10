@@ -1,0 +1,10 @@
+### ISSUE-1: The watcher diagram still has one ambiguous non-internal API reference
+- Category: correctness
+- Severity: low
+- Problem: The watcher diagram still says `eval.jsonl → parse + POST /api (→ DB write)` ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L578)), while the surrounding prose now says watcher write-backs use the internal API ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L601)).
+- Why it matters: The runtime contract is almost fully aligned, but the final sweep is not actually complete and one diagram label still leaves the endpoint family/auth path ambiguous.
+- Suggested fix: Replace that diagram label with the specific internal endpoint call, or at minimum `POST /api/v1/internal/...`, so every watcher flow reference is unambiguously internal.
+
+### VERDICT
+- Status: REVISE
+- Reason: Only a small leftover remains, but the watcher/API contract is not yet 100% internally consistent.

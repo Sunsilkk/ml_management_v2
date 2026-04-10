@@ -1,0 +1,10 @@
+### ISSUE-1: Metrics And Charting Contract Still Overpromises What The Adapter/Data Model Capture
+- Category: correctness
+- Severity: medium
+- Problem: The spec now correctly matches the 10-iteration log cadence, but the remaining metrics contract is still not fully aligned with the checked SALAD outputs. The adapter is defined as parsing stdout, which only exposes sampled loss text and printed AUC summaries, while the schema/UI still imply richer structured metrics such as `loss_st`-style fields and a per-branch logical-vs-structural breakdown bar chart. `training_evaluations` also still stores only combined/appearance/mahalanobis/composition columns, not the logical/structural breakdown the UI calls for.
+- Why it matters: An implementation can follow the spec and still be unable to power all of the promised charts from the persisted data model without additional instrumentation or schema fields.
+- Suggested fix: Either narrow the Phase 1 charts and metrics schema to the values the adapter can really extract from SALAD stdout, or explicitly add instrumentation plus persistence fields/JSON payloads for logical/structural breakdown and the full loss family.
+
+### VERDICT
+- Status: REVISE
+- Reason: The spec is close, but there is still one remaining mismatch between the persisted metrics contract and the charts/UI it promises.

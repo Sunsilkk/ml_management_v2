@@ -1,0 +1,6 @@
+## Fix for Round 6 Issue
+
+### ISSUE-1 (LOW): Stale diagram label — FIXED
+- L581: Replaced `eval.jsonl → parse + POST /api (→ DB write)` → `eval.jsonl → parse + POST /api/v1/internal/...`
+- Final sweep: zero remaining generic "POST /api" or "→ API server" or "via API" references in watcher context
+- All watcher flows now 100% consistently reference /api/v1/internal/* endpoints

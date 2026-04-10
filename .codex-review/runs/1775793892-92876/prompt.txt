@@ -1,0 +1,23 @@
+## Issues Accepted & Fixed (Round 4 → Round 5)
+
+### ISSUE-1 (Metrics/charting contract overpromises): FIXED
+Three changes made:
+
+1. **training_evaluations table expanded:** Added auc_logical and auc_structural columns alongside existing auc_appearance, auc_mahalanobis, auc_composition. Now 6 AUC columns total, matching what SALAD eval actually computes.
+
+2. **Adapter: instrument, not just parse stdout:** Changed from 'parse stdout' to 'instrument SALAD code via monkey-patched callbacks'. This is more reliable — e.g., logical/structural AUC breakdown is only available in return values, not printed to stdout. Added explicit note explaining why instrumentation is needed over stdout parsing.
+
+3. **UI charts narrowed to available data:**
+   - Loss curves: explicitly named all 6 loss fields (loss_total, loss_st, loss_ae, loss_stae, loss_comp_recon, loss_comp_mask) + noted 'sampled every 10 iters'
+   - AUC over checkpoints: added logical, structural to the chart series + noted 'sampled every 10k iters'
+   - Replaced vague 'Per-branch breakdown bar chart' with precise 'Final AUC bar chart: logical vs structural breakdown per branch (appearance, mahalanobis, composition)'
+
+4. **Eval metrics section:** Added AUC Logical and AUC Structural to the metrics list with descriptions.
+
+Every chart/metric now maps 1:1 to a persisted column or JSONB field that the adapter can produce via instrumentation.
+
+## Issues Disputed
+None.
+
+## Your Turn
+Re-review. All prior closed issues should stay closed.

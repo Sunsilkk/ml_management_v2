@@ -1,0 +1,31 @@
+### ISSUE-1: Execution-unit contradiction still exists in Section 4
+- Category: architecture
+- Severity: high
+- Problem: Section 3 now states `1 Celery task = 1 job = 1 container`, but Section 4 still says the platform uses individual step calls and that each step is one Celery task.
+- Why it matters: Retry scope, queue semantics, resume behavior, and artifact ownership still depend on which execution unit is actually authoritative.
+- Suggested fix: Remove the stale per-step Celery wording from Section 4 and make every orchestration, resume, and storage section consistently describe one job-level container execution model.
+
+### ISSUE-2: Attempt-scoped MinIO fencing is not propagated through checkpoint/resume paths
+- Category: correctness
+- Severity: high
+- Problem: The dispatch contract now says all attempt-scoped artifacts live under `training-jobs/{job_id}/attempts/{attempt_id}/`, but the checkpoint upload lifecycle and `last_checkpoint_path` still use canonical `training-jobs/{job_id}/checkpoints/{iteration}/` paths.
+- Why it matters: The plan no longer has one unambiguous source of truth for where resumable checkpoints live, so duplicate-attempt isolation and resume behavior are still underspecified.
+- Suggested fix: Rewrite checkpoint storage, `last_checkpoint_path`, and resume path rules to use attempt-qualified paths end to end, then define a separate promotion/canonicalization step only after the active attempt succeeds.
+
+### ISSUE-3: Promotion eligibility is still using an unsafe checkpoint proxy
+- Category: correctness
+- Severity: high
+- Problem: Promotion eligibility says an iteration is valid if `last_checkpoint_path` points to that iteration or later, while the watcher still skips intermediate checkpoint uploads when a newer one arrives.
+- Why it matters: A best-eval iteration can still be marked promotion-eligible even if that exact iteration’s checkpoint was never durably uploaded.
+- Suggested fix: Track durable checkpoint availability per iteration explicitly, or forbid skipping intermediate checkpoint uploads for any iteration that can participate in promotion.
+
+### ISSUE-4: Phase 1 validation still allows datasets with no anomaly examples
+- Category: correctness
+- Severity: high
+- Problem: Validation now hard-fails missing `ground_truth` when anomaly folders exist, but it still does not require anomaly folders or anomaly samples at all for Phase 1 SALAD datasets.
+- Why it matters: A dataset with only `good` images can pass validation even though Phase 1 depends on AUC-based evaluation, comparison, and `best_eval` promotion.
+- Suggested fix: Require validation/test anomaly data plus matching ground truth for Phase 1 SALAD datasets, or explicitly define a no-eval/no-promotion mode and remove those jobs from the normal registry/comparison flow.
+
+### VERDICT
+- Status: REVISE
+- Reason: The plan is close, but there are still unresolved contradictions in execution granularity and checkpoint/artifact semantics that affect retry, resume, and model promotion.

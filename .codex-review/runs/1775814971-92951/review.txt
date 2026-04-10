@@ -1,0 +1,17 @@
+### ISSUE-1: Internal worker registration/config endpoints are still referenced but not specified
+- Category: architecture
+- Severity: medium
+- Problem: The registration flow depends on `POST /api/v1/internal/workers/register` and `GET /api/v1/internal/workers/{name}/config`, but these endpoints are still not listed in the Internal Worker Daemon Endpoints section.
+- Why it matters: The worker bootstrap/control-plane path is part of the core architecture, and leaving it outside the API contract forces implementers to invent request/response semantics.
+- Suggested fix: Add both worker bootstrap/config endpoints to the internal API section with their authentication and payload contracts.
+
+### ISSUE-2: Retention table still uses a stale checkpoint path
+- Category: architecture
+- Severity: medium
+- Problem: The retention table still lists `training-jobs/{id}/checkpoints/` as a lifecycle target, while the finalized storage model stores checkpoints under `training-jobs/{job_id}/attempts/{attempt_id}/checkpoints/`.
+- Why it matters: Operations and cleanup logic now have two different checkpoint path contracts in the same plan.
+- Suggested fix: Update the retention table to use the finalized attempt-scoped checkpoint path.
+
+### VERDICT
+- Status: REVISE
+- Reason: The plan is effectively complete, but two small contract mismatches remain in the internal API and retention sections.

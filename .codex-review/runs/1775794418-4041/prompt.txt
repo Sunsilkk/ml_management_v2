@@ -1,0 +1,33 @@
+## Issues Accepted & Fixed (Round 5 → Round 7)
+
+### ISSUE-1 (Bar chart needs branch-split data not in schema): FIXED by adding full schema
+
+User explicitly requested detailed charts, NOT simplified. Changes:
+
+1. **training_evaluations table: Added 6 per-branch split columns:**
+   - auc_appearance_logical, auc_appearance_structural
+   - auc_mahalanobis_logical, auc_mahalanobis_structural
+   - auc_composition_logical, auc_composition_structural
+   Total: 15 AUC columns now (3 overall + 3 branch combined + 6 branch splits + 3 top-level)
+
+2. **UI bar chart restored to detailed version:**
+   - Per-branch AUC grouped bar chart: 3 groups (appearance, mahalanobis, composition), each with 2 bars (logical vs structural)
+   - Data source: training_evaluations columns auc_{branch}_{type}
+
+3. **Adapter updated:**
+   - eval.jsonl now outputs 15 fields (was 6)
+   - Per-branch logical/structural computed from per-image branch scores + folder labels
+   - This is possible because test_salad.py has per-image scores from each branch AND knows the anomaly type from folder structure
+
+4. **Chart data contract note added:**
+   - All chart data derives from training_metrics.metrics (JSONB) and training_evaluations columns
+   - No chart requires data not persisted in these tables
+   - Every bar in the chart maps to exactly one column in training_evaluations
+
+Every chart now maps 1:1 to persisted data. The schema is comprehensive, not simplified.
+
+## Issues Disputed
+None.
+
+## Your Turn
+Re-review. All prior closed issues should stay closed. This addresses the last remaining gap.

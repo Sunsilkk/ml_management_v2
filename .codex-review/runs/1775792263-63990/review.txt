@@ -1,0 +1,73 @@
+### ISSUE-1: Config Surface Does Not Match The Actual SALAD Pipeline
+- Category: correctness
+- Severity: critical
+- Problem: The spec treats SALAD as a highly configurable pipeline, but the checked scripts do not expose most of those controls. `create_pseudo_labels.py` only accepts `n_clusters`; `iou_threshold` and `min_mask_area` are hard-coded. `train_composition_segmentation_model.py` only exposes `epochs`; `learning_rate` and `batch_size` are hard-coded. `train_salad.py` only takes `train_steps`, `seed`, paths, and weights; most step 4 hyperparameters in the spec are hard-coded. The spec also assumes structured checkpoint and metric outputs that the current scripts do not natively produce.
+- Why it matters: The API, UI schema, and stored job config would promise behavior the actual runner cannot honor. That makes jobs non-reproducible and the spec materially inaccurate.
+- Suggested fix: Narrow the spec to the parameters and artifacts the current SALAD code really supports, or explicitly require a wrapper/adaptation layer that adds the missing config controls and output contracts before approval.
+
+### ISSUE-2: MinIO And Dataset Layout Do Not Match SALAD’s Filesystem Contract
+- Category: correctness
+- Severity: critical
+- Problem: The spec’s dataset/version tree does not match what the SALAD scripts expect on disk. The code expects a category-rooted dataset like `{root}/{category}/{train,validation,test,ground_truth/...}` plus a separate segmentation-map tree under `{seg_root}/{category}/...`, and it relies on exact class names like `logical_anomalies` and `structural_anomalies`. The spec omits the required `ground_truth` tree, abstracts away the category root, and uses folder examples that do not fully align with the code.
+- Why it matters: The described MinIO structure is not sufficient to run steps 1-4 as written, especially final evaluation and anomaly-mask handling.
+- Suggested fix: Rewrite the storage section as exact per-step input/output filesystem contracts, including category root, `ground_truth`, exact folder names, and the real intermediate file layout.
+
+### ISSUE-3: Model Registry Artifact Is Incomplete For Inference
+- Category: correctness
+- Severity: critical
+- Problem: The spec stores only the five final `.pth` weights and summary metrics, but `test_salad.py` needs additional derived artifacts for inference: normalization values, quantiles, and Mahalanobis statistics computed from training/validation data.
+- Why it matters: Phase 2 inference cannot be reliably reproduced from the proposed model-registry bundle alone. Exported models would be incomplete.
+- Suggested fix: Define a full inference bundle that includes weights plus all calibration/statistics artifacts, pipeline version, image/container version, and a manifest describing how inference must be executed.
+
+### ISSUE-4: Job Scheduling Has Unresolved Redelivery And Split-Brain Races
+- Category: architecture
+- Severity: high
+- Problem: The spec says jobs go into Redis and idle workers pick them, but it does not define queue routing, acknowledgement strategy, prefetch behavior, lease ownership, or idempotent start semantics for long-running GPU tasks. With Redis/Celery, worker restart or task redelivery can duplicate a training job or leave stale worker/job state.
+- Why it matters: Duplicate runs waste scarce GPU time, corrupt status tracking, and can create conflicting uploads under the same job ID.
+- Suggested fix: Add an explicit dispatch contract: queue-per-worker or queue-per-GPU routing, atomic job lease acquisition, idempotent start tokens, late ack/visibility-timeout policy, and heartbeat-based recovery.
+
+### ISSUE-5: The Schema Does Not Properly Model Step Execution Or Enforce Key Relationships
+- Category: correctness
+- Severity: high
+- Problem: `training_jobs` only has coarse job-level state and `current_step`; there is no normalized `job_steps` or `job_attempts` model for per-step status, retries, timings, logs, or artifact paths. The schema also duplicates relationship state in ways that can drift, such as `dataset_id` plus `version_id`, `worker_name` plus `workers.current_job_id`, and model lineage copied both from job and direct FKs.
+- Why it matters: Progress reporting, retry/resume, auditing, and future support for non-4-step pipelines become brittle, and the database can represent inconsistent states.
+- Suggested fix: Add step/attempt tables and make worker assignment and dataset/version lineage single-sourced with enforceable foreign-key rules.
+
+### ISSUE-6: Failure, Retry, Cancel, And Resume Semantics Are Underspecified
+- Category: sequencing
+- Severity: high
+- Problem: The spec says failed jobs upload logs and clean up, but it does not define retry policy, resume rules, cancellation propagation into containers/Celery, or how partial outputs are marked valid vs invalid. There are also no endpoints for retrying or resuming a failed multi-step job.
+- Why it matters: A transient failure in step 4 could force a full rerun of expensive earlier steps, or leave orphaned artifacts that look valid.
+- Suggested fix: Define per-step retry/resume behavior, artifact validity markers, cancellation states, cleanup guarantees, and explicit retry/resume APIs.
+
+### ISSUE-7: WebSocket Log Streaming Is Not Durable Enough
+- Category: architecture
+- Severity: high
+- Problem: The spec defines live WebSocket log streaming but not how logs are persisted, chunked, resumed after disconnect, filtered by step, or backfilled from an offset/cursor. Historical logs in MinIO are not enough to support reliable reconnect semantics for long-running jobs.
+- Why it matters: Users will miss log lines after reconnects, multi-client viewing will be unreliable, and the API layer risks becoming a fragile ad hoc log relay.
+- Suggested fix: Specify a durable log pipeline with append-only chunks, step-aware offsets, reconnect/backfill semantics, EOF markers, and authenticated WS access.
+
+### ISSUE-8: Dataset Upload Through FastAPI Is A Scalability Bottleneck
+- Category: architecture
+- Severity: high
+- Problem: `POST /api/v1/datasets/` is defined as “upload zip + create dataset,” which puts large binary upload, validation, and ingestion on the app server request path. There is no upload-session flow, direct object-storage upload, or async validation lifecycle.
+- Why it matters: Large dataset uploads will hit timeouts, consume API resources, and create unclear partial states when requests fail mid-upload.
+- Suggested fix: Split ingestion into upload-session, direct multipart upload to MinIO, and async extraction/validation with explicit status endpoints.
+
+### ISSUE-9: External Runtime Dependencies Are Missing From The Prerequisite Model
+- Category: risk
+- Severity: high
+- Problem: The spec assumes MinIO-backed prerequisites and stateless containers, but the checked code still fetches runtime dependencies from the internet, including DINO weights and a focal-loss package via `torch.hub`. The spec also describes DINO sourcing differently from the actual code path.
+- Why it matters: Jobs may fail in restricted GPU environments, and the system becomes less reproducible and harder to secure operationally.
+- Suggested fix: Decide and document one policy: either bake/mirror every runtime dependency into container images or MinIO with checksums, or explicitly require controlled outbound network access and version-pin every external artifact.
+
+### ISSUE-10: Security Requirements Are Too Thin For Remote Training Infrastructure
+- Category: risk
+- Severity: high
+- Problem: The spec mentions JWT auth but not authorization rules for datasets/jobs/models/logs/admin endpoints, upload hardening for ZIP/image parsing, secret handling between services, or container isolation on the GPU host. That is especially weak given the stated path toward multi-tenancy.
+- Why it matters: This leaves obvious gaps around privilege boundaries, unsafe uploads, data leakage, and host compromise risk.
+- Suggested fix: Add a dedicated security section covering RBAC/ownership checks, admin-only scopes, upload limits and zip-bomb/path-traversal defenses, secret management, non-root containers, restricted mounts/networking, and tenant isolation assumptions.
+
+### VERDICT
+- Status: REVISE
+- Reason: The spec is directionally solid, but its executable contract is not aligned with the actual SALAD pipeline, and it is missing critical details for storage correctness, inference artifacts, scheduling reliability, and operational safety.

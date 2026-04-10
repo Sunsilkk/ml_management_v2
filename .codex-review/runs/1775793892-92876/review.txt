@@ -1,0 +1,10 @@
+### ISSUE-1: The Final AUC Bar Chart Still Needs More Data Than The Schema Persists
+- Category: correctness
+- Severity: medium
+- Problem: The updated spec now persists `auc_logical`, `auc_structural`, `auc_appearance`, `auc_mahalanobis`, and `auc_composition`, but the UI still promises a final bar chart showing logical vs structural breakdown per branch. That chart needs branch-split values such as appearance-logical vs appearance-structural, mahalanobis-logical vs mahalanobis-structural, and composition-logical vs composition-structural. The current `training_evaluations` table and adapter payload do not store those six branch-specific split metrics.
+- Why it matters: The chart cannot be rendered from the persisted contract as currently defined; the data model still loses information the UI claims to show.
+- Suggested fix: Either add branch-split persisted fields/JSON for logical and structural AUC per branch, or narrow the chart to metrics that are actually stored.
+
+### VERDICT
+- Status: REVISE
+- Reason: The spec is very close, but one last metrics-to-UI mismatch remains around the branch-level logical/structural AUC breakdown chart.

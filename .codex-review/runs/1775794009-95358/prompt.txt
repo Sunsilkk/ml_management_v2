@@ -1,0 +1,16 @@
+## Issues Accepted & Fixed (Round 5 → Round 6)
+
+### ISSUE-1 (Bar chart needs branch-split data not in schema): FIXED by narrowing chart
+- Removed 'logical vs structural breakdown per branch' bar chart (would need 6 extra columns: appearance_logical, appearance_structural, etc.)
+- Replaced with simpler 'Final AUC bar chart: 3 bars per branch (appearance, mahalanobis, composition) showing branch-only AUC'
+- This only requires auc_appearance, auc_mahalanobis, auc_composition — all already in training_evaluations
+- AUC line chart still shows combined, logical, structural over time — all stored in training_evaluations
+- Added explicit contract note: 'All chart data derives from training_metrics.metrics (JSONB) and training_evaluations columns. No chart requires data not persisted in these tables.'
+
+Every chart now maps 1:1 to persisted data. No chart promises data the schema doesn't store.
+
+## Issues Disputed
+None.
+
+## Your Turn
+Re-review. This should be the final round.

@@ -1,0 +1,17 @@
+### ISSUE-1: The Adapter Metrics Contract Is Still Not Executable As Written
+- Category: correctness
+- Severity: high
+- Problem: The new adapter section says the wrapper will parse SALAD stdout into `loss.jsonl` with one line per iteration, but the checked `train_salad.py` only emits human-readable loss output every 10 iterations and only for a subset of losses. The spec also still has one leftover filename drift in the training-job path, which uses `comp_ae` in the step 4 final bundle even though the actual artifact is `comp_autoencoder_final.pth`.
+- Why it matters: The logging/metrics pipeline still promises fidelity the current SALAD process does not expose, so charts and stored metrics can silently diverge from reality. The remaining filename mismatch also reintroduces artifact lookup risk.
+- Suggested fix: Either instrument the runner/code path to emit structured metrics at source, or downgrade the spec to sampled metrics that match the real output cadence. Also make the step 4 final artifact names consistent everywhere with `comp_autoencoder_final.pth`.
+
+### ISSUE-2: The New `calibration.pt` Schema Still Does Not Match The Actual Inference Inputs
+- Category: correctness
+- Severity: high
+- Problem: The new single-file calibration bundle is the right direction, but its schema is still wrong relative to the checked SALAD code. `teacher_mean` and `teacher_std` are not `[384, H, W]`; they are channelwise tensors shaped like `[1, 384, 1, 1]`. `q_st_*` and `q_ae_*` are scalar quantiles, not `[1, 384, 1, 1]`. More importantly, the runtime uses both `q_eff_*` and `q_seg_*`, plus per-class Mahalanobis normalization dictionaries (`q_start_mah`, `q_end_mah`) and multiple mean/covariance structures, which are not represented cleanly in the current schema.
+- Why it matters: The export bundle is still not a precise contract for reproducible inference. An implementation that follows the written schema literally would save the wrong values or omit required ones.
+- Suggested fix: Rewrite the calibration schema directly from the inference call signature and helper outputs, using the exact runtime variable names, shapes, and dict structures produced by the SALAD code.
+
+### VERDICT
+- Status: REVISE
+- Reason: The round-3 spec is much tighter, but the structured metrics adapter and the `calibration.pt` schema still do not accurately match the actual SALAD training and inference contracts.

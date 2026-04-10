@@ -1,0 +1,22 @@
+## All Issues Accepted & Fixed in Round 5
+
+### R5-ISSUE-1: Step 4 checkpoint state unsafe across attempts [ACCEPTED & FIXED]
+Three changes: (1) Added `resume_source_checkpoint` column to job_steps — stores the source checkpoint path when resuming from a previous attempt (immutable after set, audit trail). (2) Added explicit new attempt reset rule in dispatch contract: when API creates new attempt_id, it atomically resets last_checkpoint_path=NULL, durable_checkpoint_iterations=[], and sets resume_source_checkpoint if applicable. (3) Updated column descriptions in schema to document reset behavior.
+
+### R5-ISSUE-2: Log read semantics not attempt-aware [ACCEPTED & FIXED]
+Three changes: (1) All public read APIs (metrics, evaluations, logs) now default to current_attempt_id with optional ?attempt_id= query param for historical debugging. (2) WebSocket live streaming explicitly resolves current_attempt_id from job and subscribes to attempt-scoped Redis channel. (3) Backfill reads from attempt-scoped MinIO paths.
+
+## Summary of all changes across 5 rounds (Revisions 2→7):
+- Execution model: 1 Celery task = 1 job = 1 container (R1, R3)
+- Attempt fencing: current_attempt_id + MinIO attempt-scoped paths (R1, R2, R4)
+- New attempt reset: checkpoint state atomically cleared (R5)
+- Runtime manifest: docker_image_digest, pipeline_version, checksums (R1)
+- Promotion: eval_interval==checkpoint_interval, durable_checkpoint_iterations per-iteration tracking, ALL checkpoints uploaded (R2, R3)
+- Dataset: soft-delete, anomaly data + ground_truth required, full validation rules (R1, R2, R3)
+- Idempotent ingestion: attempt-scoped UNIQUE constraints on metrics/evaluations (R1, R4)
+- Retention lifecycle: MinIO retention table with rules per bucket (R1)
+- Worker auth: pull-based registration, token_hash, authorization binding (R1)
+- Attempt-aware APIs: default current_attempt_id, optional historical (R5)
+
+## Your Turn
+This should be the final round. Re-review using the same output format.

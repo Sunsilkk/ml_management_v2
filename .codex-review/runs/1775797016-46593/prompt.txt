@@ -1,0 +1,8 @@
+## Fix for Round 4 Issue
+
+### ISSUE-1 (MEDIUM): Worker-daemon auth model contradiction — FIXED
+- Section 13 updated: Replaced "service account JWT (long-lived, admin-scoped, rotated monthly)" with "X-Worker-Token header (pre-shared secret per worker, stored hashed in workers table)"
+- Now consistent with Section 7 Internal Worker Daemon Endpoints
+- Single auth model: X-Worker-Token for all /api/v1/internal/* endpoints
+- Token lifecycle defined: rotated monthly, revoked on worker deregistration
+- Explicitly states "No JWT needed — worker daemon only calls internal endpoints"

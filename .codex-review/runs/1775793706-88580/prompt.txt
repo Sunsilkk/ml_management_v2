@@ -1,0 +1,25 @@
+## Issues Accepted & Fixed (Round 3 → Round 4)
+
+### ISSUE-1 (Adapter metrics cadence + leftover filename): FIXED
+- loss.jsonl: Changed from '1 line per iteration' to '1 line per 10 iters' (matching SALAD's actual log cadence)
+- Added explicit note: ~7000 entries for 70k steps, not 70k entries
+- eval.jsonl: Added note ~7 entries (every 10k iters)
+- MinIO layout comment updated to match
+- Fixed last remaining filename: training-jobs path now uses comp_autoencoder (not comp_ae)
+
+### ISSUE-2 (calibration.pt schema wrong shapes): FIXED - Complete rewrite from source
+- teacher_mean/std: Fixed to [1, 384, 1, 1] (not [384, H, W])
+- q_st_start/end, q_ae_start/end: Fixed to scalar torch.Tensor (not [1, 384, 1, 1])
+- Added missing variables: q_eff_start/end (float), q_seg_start/end (float)
+- Added global Mahalanobis: feature_vectors_mean [384], feature_vectors_covinv [384, 384]
+- Added per-class seg Mahalanobis: feature_vectors_mean_seg Dict[int→[384]], feature_vectors_covinv_seg Dict[int→[384,384]]
+- Added per-class area-weighted: feature_vectors_mean_seg_area Dict[int→[1]], feature_vectors_covinv_seg_area Dict[int→[1,1]]
+- Added Mahalanobis score normalization: q_start_mah Dict[Union[str,int]→float], q_end_mah same
+- Added type notes: torch.Tensor vs float vs np.ndarray (float64), mixed dict keys ('full' str + int)
+- Schema now maps 1:1 to test_salad.py test() function signature
+
+## Issues Disputed
+None. Both accepted and fixed with exact source-level verification.
+
+## Your Turn
+Re-review. All prior closed issues should stay closed.

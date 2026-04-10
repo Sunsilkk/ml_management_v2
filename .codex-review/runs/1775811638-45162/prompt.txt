@@ -1,0 +1,39 @@
+## Issues Accepted & Fixed
+
+### ISSUE-2: Heartbeat requeue → duplicate runs [ACCEPTED & FIXED]
+Added `current_attempt_id` fencing token to training_jobs schema. All worker writes must include matching attempt_id. On requeue, API generates new attempt_id, fencing out old executor. See updated Section 3 (dispatch contract) and Section 6 (training_jobs schema).
+
+### ISSUE-3: Resume not pinned to immutable runtime inputs [ACCEPTED & FIXED]
+Added `runtime_manifest` JSONB column to training_jobs with docker_image_digest, pipeline_schema_version, salad_pipeline_version, prerequisite_checksums, dataset_version_id. Updated manifest.json to include runtime block. See updated Section 5 (manifest) and Section 6 (training_jobs schema).
+
+### ISSUE-4: Durable ingestion not idempotent [ACCEPTED & FIXED]
+Changed training_metrics index to UNIQUE on (job_id, step, iteration) with INSERT ON CONFLICT DO NOTHING. Same for training_evaluations UNIQUE on (job_id, iteration). All internal writes require X-Attempt-Id header matching current_attempt_id. Log chunks use offset-keyed MinIO paths (inherently idempotent). See updated Section 6.
+
+### ISSUE-5: Model registry promotion semantics undefined [ACCEPTED & FIXED]
+Added `source_iteration` and `promotion_strategy` columns to models table. Updated manifest.json with `promotion` block specifying source=best_eval, selected_iteration, selection_criterion. Phase 1 policy: promote checkpoint with highest auc_combined. See updated Section 5 + Section 6.
+
+### ISSUE-6: Dataset/artifact retention rules missing [ACCEPTED & FIXED]
+Added MinIO Retention Lifecycle table in Section 3 (after Cleanup Policy). Rules: job artifacts expire after 30 days, checkpoints deleted after model promotion, registered models permanent, datasets permanent until admin delete. Failed jobs retain for 7 days.
+
+### ISSUE-9: Schema doesn't support declared workflows [ACCEPTED & FIXED]
+Added `status` ENUM('pending_upload','uploading','processing','ready','failed'), `raw_file_name`, `raw_file_size`, `validation_error` columns to datasets table. Added Dataset Validation Rules section with MVTec LOCO structure checks. See updated Section 5 + Section 6.
+
+## Issues Disputed
+
+### ISSUE-1: Orchestration model is internally inconsistent [DISPUTED]
+The three sections describe different abstraction layers, NOT contradictions:
+- Section 3 (Worker System): Describes the DAEMON-LEVEL lifecycle — daemon receives Celery task, spawns container, manages per-job Docker lifecycle. "Pull from MinIO" and "Upload results" here refer to daemon actions (daemon has network), NOT container actions.
+- Section 4 (SALAD Pipeline): Describes INSIDE the container — salad_pipeline library + FilesystemCallback writing to /workspace/ipc/.
+- Section 5 (IPC Architecture): Explicitly bridges both layers — container writes IPC files, daemon watches and forwards to MinIO/Redis/API.
+The plan DOES state one execution model: Celery dispatches task → daemon spawns air-gapped container → container writes IPC → daemon forwards. This is consistent across all three sections.
+
+**However** — I accept that the clarification could be made more explicit. I've added an "Execution ownership" block at the top of Section 3 that explicitly names Celery as dispatch-only, daemon as execution owner, and DB as state source of truth.
+
+### ISSUE-7: Worker admission ignores local staging capacity [DISPUTED — LOWER SEVERITY]
+Section 13 already specifies `--memory`, `--cpus`, `--shm-size` set per worker config. The daemon allocates these at container creation time. Disk capacity is bounded by worker config + tmpfs size limits. For Phase 1 with 2-3 workers, these are admin-configured values. Full dynamic admission with preflight estimates is over-engineering for this scope. I downgrade this to LOW severity (operational concern, not architectural gap).
+
+### ISSUE-8: Control-plane authorization underspecified [PARTIALLY ACCEPTED]
+The plan DID already describe X-Worker-Token in Section 13 (line 1369): "Worker daemon authenticates to API with X-Worker-Token header (pre-shared secret per worker, stored hashed in workers table)". However, I accept that mutation-scope binding was missing. I've added: (1) `token_hash` column to workers schema, (2) Authorization binding rules (X-Worker-Token + X-Attempt-Id + lease ownership check) to internal API section.
+
+## Your Turn
+Re-review using the same output format. Keep prior accepted points closed unless regression exists.

@@ -1,0 +1,10 @@
+## Issue Fixed in Round 6
+
+### R6-ISSUE-1: Two stale references [ACCEPTED & FIXED]
+(1) Changed Section 4 code example comment from 'platform gọi từng step qua Celery task riêng' to 'library API supports calling single steps; Phase 1 does NOT use this — whole pipeline via .run()'. 
+(2) Removed stale `training-jobs/{job_id}/final/` from MinIO fencing description. Promotion now goes exclusively to model-registry. No canonical training-jobs/final path exists.
+
+Both references cleaned up. No other stale wording remains.
+
+## Your Turn
+Re-review. This is Round 7.

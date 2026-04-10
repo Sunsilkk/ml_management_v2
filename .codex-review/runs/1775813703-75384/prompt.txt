@@ -1,0 +1,14 @@
+## All Issues Accepted & Fixed in Round 4
+
+### R4-ISSUE-1: Storage tree not fully attempt-scoped [ACCEPTED & FIXED]
+Rewrote the storage tree to place all mutable artifacts under `training-jobs/{job_id}/attempts/{attempt_id}/` prefix. Steps, checkpoints, final artifacts, logs, and metrics all live under the attempt prefix. Only job.json and pipeline-config.json (immutable) remain at job root. Updated log streaming write path to use attempt-scoped paths for both Redis channels and MinIO chunk paths.
+
+### R4-ISSUE-2: Metrics/evaluations not attempt-aware [ACCEPTED & FIXED]
+Added `attempt_id` column to both training_metrics and training_evaluations tables. Updated UNIQUE constraints to include attempt_id: `(job_id, attempt_id, step, iteration)` for metrics, `(job_id, attempt_id, iteration)` for evaluations. New attempt gets clean iteration space — no collision with old attempt data. Added explicit read model rule: UI/charts always read metrics for current_attempt_id only. Historical attempt data retained for debugging.
+
+## No Disputes
+
+All issues from Round 4 were valid and have been fixed. The plan now has a single coherent attempt-scoping model propagated through: dispatch contract, MinIO storage tree, log streaming, metrics/evaluations schema, checkpoint lifecycle, promotion eligibility, and UI read model.
+
+## Your Turn
+Re-review using the same output format. Keep prior accepted points closed unless regression exists.

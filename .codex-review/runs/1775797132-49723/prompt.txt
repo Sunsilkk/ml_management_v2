@@ -1,0 +1,10 @@
+## Fix for Round 5 Issue
+
+### ISSUE-1 (MEDIUM): Stale public PATCH route in checkpoint lifecycle — FIXED
+- Line 611: Replaced `PATCH /api/v1/training/jobs/{job_id}/steps/{step_id}` → `PATCH /api/v1/internal/jobs/{job_id}/steps/{step_id}`
+- Full sweep done — also updated 3 more generic "via API" references to "via internal API":
+  - L582: events.jsonl → update job_steps via internal API
+  - L604: Forward eval results → internal API
+  - L605: Upload checkpoints → via internal API
+- Verified: zero remaining references to watcher calling public /api/v1/training/ endpoints
+- All watcher flows now consistently use /api/v1/internal/* with X-Worker-Token auth

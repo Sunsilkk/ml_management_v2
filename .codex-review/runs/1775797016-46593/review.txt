@@ -1,0 +1,10 @@
+### ISSUE-1: Checkpoint lifecycle still references the old public PATCH route
+- Category: correctness
+- Severity: medium
+- Problem: Section 7 now defines the watcher write-back path under `/api/v1/internal/*` ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L958)), but the checkpoint upload lifecycle still says the watcher calls `PATCH /api/v1/training/jobs/{job_id}/steps/{step_id}` after upload ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L608)).
+- Why it matters: The runtime flow is still not fully aligned with the new internal-endpoint/auth model, so implementers can wire the watcher to the wrong route.
+- Suggested fix: Replace that stale public path with the corresponding `/api/v1/internal/jobs/{id}/steps/{step_id}` route and do one final sweep to ensure every watcher example uses the internal endpoint family consistently.
+
+### VERDICT
+- Status: REVISE
+- Reason: The spec is nearly there, but one stale watcher endpoint reference still conflicts with the internal API contract.

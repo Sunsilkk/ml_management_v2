@@ -1,0 +1,14 @@
+## Fix for Round 3 Issue
+
+### ISSUE-1 (MEDIUM): Worker-daemon write-back endpoints undefined — FIXED
+Added complete "Internal Worker Daemon Endpoints" subsection in Section 7 API Design:
+- 6 internal endpoints under /api/v1/internal/ prefix
+- Auth model: X-Worker-Token header (pre-shared secret per worker)
+- NOT exposed to UI/external clients — GPU server network only
+- Endpoints: PATCH steps (checkpoint path), POST metrics (batch loss), POST evaluations (12 AUC), POST logs, PATCH job status, GET cancel-status
+- Added explicit 5-step flow mapping IPC watcher actions → specific API calls:
+  1. loss.jsonl → batch POST metrics every 5s
+  2. eval.jsonl → POST evaluations
+  3. checkpoint .done → upload MinIO → PATCH step with last_checkpoint_path
+  4. Poll cancel-status every 2s → touch should_stop
+  5. Container exit → upload final → PATCH job completed/failed

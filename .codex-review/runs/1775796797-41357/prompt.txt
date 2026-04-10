@@ -1,0 +1,29 @@
+## Fixes Applied for Round 2 Issues
+
+### ISSUE-1 (HIGH): Stale direct-callback in Section 4 — FIXED
+- Replaced Section 4 callback bullets (L401-405) with IPC-aligned version: FilesystemCallback writes local files only, host watcher forwards
+- Added explicit ownership model: "Library computes all metrics. FilesystemCallback only writes IPC files. Host watcher only forwards."
+- Section 6 "Adapter tính được" → "Library tính nội bộ" — aligned with library-computes-all-12 contract
+- All 3 sections (4, 5, 6) now consistently describe the same ownership boundary
+
+### ISSUE-2 (HIGH): last_checkpoint_path producer undefined — FIXED
+- Added explicit checkpoint upload lifecycle (5 steps):
+  1. Container writes checkpoint + .done marker (atomic rename)
+  2. Watcher detects .done → uploads to MinIO
+  3. Upload succeeds → PATCH job_steps.last_checkpoint_path
+  4. Upload fails → retry 3x, do NOT update column (resume uses previous checkpoint)
+  5. New checkpoint during upload → queue, skip intermediate
+- Column updated ONLY after successful upload — no race condition
+
+### ISSUE-3 (MEDIUM): IPC lacks completion semantics — FIXED
+- Added "Atomic write contract" section with 3 rules:
+  - JSONL: single write() syscall per line (atomic up to PIPE_BUF=4096, each line ~200 bytes)
+  - Directories: write to .tmp/ then os.rename() + .done marker. Watcher ignores dirs without .done
+  - Rationale: os.rename() POSIX-atomic on same filesystem
+- Watcher reads only complete JSONL lines (ignore trailing partial)
+
+### ISSUE-4 (MEDIUM): Composition maps path shorthand — FIXED
+- Replaced {good,logical,structural} shorthand with exact SALAD folder names:
+  - validation/good/ (only good — no anomalies in validation)
+  - test/good/, test/logical_anomalies/, test/structural_anomalies/
+- Now matches baseline train_salad.py L126 and train_composition_segmentation_model.py L152

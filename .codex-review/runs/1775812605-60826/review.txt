@@ -1,0 +1,17 @@
+### ISSUE-1: Attempt-scoped storage contract is still not fully propagated
+- Category: architecture
+- Severity: high
+- Problem: The plan now says all attempt-scoped artifacts write under `training-jobs/{job_id}/attempts/{attempt_id}/`, but the storage tree still documents `training-jobs/{job_id}/steps/.../checkpoints` and `final` under the job root, and the log pipeline still writes chunks to `training-jobs/{job_id}/logs/...`. The Section 4 example block also still contains an “individual step” example comment.
+- Why it matters: Implementers still have multiple authoritative path contracts, and duplicate or stale attempts can collide in historical logs or artifacts if the canonical paths are followed.
+- Suggested fix: Rewrite the storage tree, log chunk/index paths, and example block so every attempt-scoped output lives under the attempt prefix, then define one explicit promotion/merge step for canonical job/model views.
+
+### ISSUE-2: Retry observability is still not attempt-aware
+- Category: correctness
+- Severity: high
+- Problem: `training_metrics` and `training_evaluations` are still keyed only by `job_id` plus iteration/step, while the plan allows new attempts and Step 4 reruns from iteration 0 when no checkpoint exists. A valid new attempt can therefore hit the same iteration numbers as an old failed attempt and get dropped by `ON CONFLICT DO NOTHING`.
+- Why it matters: Charts and history can show stale data from a previous failed attempt instead of the active run, and the plan still lacks a clean read model for multi-attempt jobs.
+- Suggested fix: Add `attempt_id` to metrics/evaluation records and scope reads to the active attempt, or explicitly define a truncate/replace rule when a new attempt begins.
+
+### VERDICT
+- Status: REVISE
+- Reason: The plan is close, but attempt-scoped artifact paths and multi-attempt observability are still not fully coherent.

@@ -1,0 +1,38 @@
+### ISSUE-1: Task granularity is still contradictory
+- Category: architecture
+- Severity: high
+- Problem: The plan now says Celery is dispatch-only and the daemon is the execution owner, but Section 4 still says the platform uses individual step calls and that each step is one Celery task, while the worker lifecycle still describes one container running all steps sequentially.
+- Why it matters: Retry boundaries, worker lease duration, resume scope, queue semantics, and artifact layout all depend on whether the execution unit is a whole job or a single step.
+- Suggested fix: Pick one execution unit for Phase 1 and rewrite Sections 3, 4, and 5 to use that same granularity end to end.
+
+### ISSUE-2: Fencing still does not protect object-store writes
+- Category: correctness
+- Severity: critical
+- Problem: `current_attempt_id` fences API writes, but logs, checkpoints, and final artifacts still write into shared `training-jobs/{job_id}/...` prefixes with no `attempt_id` namespace or equivalent conditional-write rule.
+- Why it matters: A stale executor can still overwrite or pollute MinIO artifacts even after its DB writes are fenced out, which means duplicate-run corruption is not fully closed.
+- Suggested fix: Make all attempt-scoped object writes land under an attempt-specific prefix and only promote/copy artifacts from the active fenced attempt into canonical job/model paths.
+
+### ISSUE-3: Best-checkpoint promotion is not coupled to durable checkpoint availability
+- Category: correctness
+- Severity: high
+- Problem: Promotion now selects `best_eval`, but evaluations are inserted independently from checkpoint uploads, checkpoint uploads can fail, intermediate checkpoints can be skipped, and `eval_interval` and `checkpoint_interval` are configurable separately.
+- Why it matters: The plan can choose an iteration as the best model even when no durable checkpoint exists for that iteration.
+- Suggested fix: Define promotion eligibility as only iterations with a successfully uploaded durable checkpoint, or make evaluation and checkpoint persistence atomic and explicitly constrain interval relationships.
+
+### ISSUE-4: Dataset retention policy still conflicts with dataset delete permissions
+- Category: risk
+- Severity: high
+- Problem: The retention section says datasets are permanent until admin delete, but the public API still exposes `DELETE /api/v1/datasets/{id}` and the security section still says dataset owners may delete their own datasets.
+- Why it matters: The lineage and reproducibility guarantee remains ambiguous, and implementation teams can legitimately build incompatible behaviors.
+- Suggested fix: Align retention, API, and auth around one delete policy and document what happens when versions, jobs, or registered models depend on that dataset.
+
+### ISSUE-5: Phase 1 evaluation behavior is still undefined when ground truth is missing
+- Category: correctness
+- Severity: high
+- Problem: Validation only warns when anomaly folders exist without matching `ground_truth`, yet Phase 1 depends on evaluation AUCs for charts, history, comparison, and `best_eval` model promotion.
+- Why it matters: The system can admit jobs whose primary success criteria and promotion logic are only partially defined.
+- Suggested fix: Either require full ground truth for Phase 1 SALAD training datasets or define an explicit no-eval/no-promotion mode with separate statuses, registry behavior, and UI expectations.
+
+### VERDICT
+- Status: REVISE
+- Reason: The fixes addressed several major issues, but the execution granularity, artifact fencing, promotion contract, and dataset/evaluation policy are still not fully coherent enough for implementation.

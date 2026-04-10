@@ -1,0 +1,23 @@
+## Issues Accepted & Fixed
+
+### R2-ISSUE-2: Fencing doesn't cover MinIO writes [ACCEPTED & FIXED]
+Added MinIO attempt fencing: all attempt-scoped artifacts write under `training-jobs/{job_id}/attempts/{attempt_id}/` prefix. On job completion, daemon promotes artifacts from active attempt prefix → canonical paths. Stale attempt prefixes cleaned up by retention. See updated Section 3 (dispatch contract).
+
+### R2-ISSUE-3: Promotion not coupled to checkpoint availability [ACCEPTED & FIXED]
+Three changes: (1) Added constraint: eval_interval must equal checkpoint_interval (ensures every eval iteration has a matching durable checkpoint). (2) Added promotion eligibility rule: iteration is eligible only if eval exists AND checkpoint was successfully uploaded. (3) Phase 1 best_eval selects highest auc_combined among eligible iterations. See updated Section 4 (Step 4 params) and Section 6 (models table).
+
+### R2-ISSUE-4: Dataset retention conflicts with delete API [ACCEPTED & FIXED]
+Changed DELETE /datasets/{id} to soft-delete (status → 'archived'). API returns 409 if active jobs or models reference the dataset. Added 'archived' to datasets status enum. Updated security section to reflect soft-delete semantics. Updated retention policy table.
+
+### R2-ISSUE-5: Eval undefined without ground_truth [ACCEPTED & FIXED]
+Changed ground_truth validation from warning to hard fail for Phase 1 SALAD pipeline. If anomaly test/validation folders exist but no matching ground_truth subfolders → validation fails. This ensures eval AUCs and best_eval promotion always have complete ground truth data.
+
+## Issues Disputed
+
+### R2-ISSUE-1: Task granularity still contradictory [DISPUTED — RESOLVED IN PLAN]
+I've added an explicit 'Phase 1 execution unit' block at the top of Section 3 that states definitively: **1 Celery task = 1 job = 1 container**. Container runs all 4 steps sequentially via SALADPipeline.run(). Per-step tracking (job_steps table) is for observability and resume only, NOT for per-step Celery dispatch.
+
+This was never a contradiction — it was an abstraction layering issue where Section 4 described the pipeline library's internal step structure (which runs INSIDE one container) while Section 3 described the external orchestration (which dispatches one container per job). The new explicit block removes any ambiguity.
+
+## Your Turn
+Re-review using the same output format. Keep prior accepted points closed unless regression exists.

@@ -1,0 +1,20 @@
+## All Issues Accepted & Fixed in Round 3
+
+### R3-ISSUE-1: Execution-unit contradiction in Section 4 [ACCEPTED & FIXED]
+Removed stale 'mỗi step là 1 Celery task' wording from Section 4. Replaced with explicit: 'Phase 1 execution model: 1 Celery task = 1 job = 1 container running all 4 steps sequentially via SALADPipeline.run()'. Now consistent across Section 3 (dispatch contract), Section 4 (pipeline), and Section 5 (IPC).
+
+### R3-ISSUE-2: Attempt-scoped MinIO fencing not propagated [ACCEPTED & FIXED]
+Updated checkpoint upload lifecycle to use attempt-scoped paths: `training-jobs/{job_id}/attempts/{attempt_id}/checkpoints/{iteration}/`. last_checkpoint_path now uses attempt-qualified path. Added explicit promotion step: on job completion, daemon promotes from active attempt prefix → canonical model-registry paths. Stale attempt prefixes cleaned by retention policy.
+
+### R3-ISSUE-3: Promotion uses unsafe checkpoint proxy [ACCEPTED & FIXED]
+Three changes: (1) Added `durable_checkpoint_iterations` INT[] column to job_steps — tracks which iterations have been successfully uploaded. (2) Promotion eligibility now checks iteration IN durable_checkpoint_iterations, not last_checkpoint_path >= iteration. (3) Watcher uploads ALL checkpoints (no skip) to ensure complete durable_checkpoint_iterations.
+
+### R3-ISSUE-4: Datasets with no anomaly examples pass validation [ACCEPTED & FIXED]
+Added validation rule: test/logical_anomalies/ AND test/structural_anomalies/ must exist with ≥1 image each for Phase 1 SALAD datasets. Fail validation if missing. This ensures eval AUCs and best_eval promotion always have complete anomaly data.
+
+## No Disputes
+
+All 4 issues from Round 3 were valid and have been fixed. The plan should now be internally consistent across execution model, artifact paths, promotion logic, and dataset requirements.
+
+## Your Turn
+Re-review using the same output format. Keep prior accepted points closed unless regression exists.

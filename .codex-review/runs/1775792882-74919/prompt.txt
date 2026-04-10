@@ -1,0 +1,74 @@
+## Issues Accepted & Fixed
+
+All 10 issues were accepted and fixed in the spec. Here is what was changed:
+
+### ISSUE-1 (Config surface): FIXED
+- Step 2: Narrowed to only n_clusters (CLI-exposed). iou_threshold/min_mask_area noted as hard-coded.
+- Step 3: Narrowed to only epochs (CLI-exposed). learning_rate/batch_size noted as hard-coded.
+- Step 4: Only train_steps, seed, imagenet_penalty exposed on UI. All other params listed as hard-coded reference table.
+- Config example updated to match narrowed params.
+
+### ISSUE-2 (MinIO layout): FIXED
+- Added category root under versions: versions/{version_id}/{category}/
+- Added exact folder names: train/good, test/logical_anomalies, test/structural_anomalies
+- Added ground_truth/ tree with binary mask structure
+- Added composition_maps/ directory under version for Steps 1-3 output
+
+### ISSUE-3 (Inference artifacts): FIXED
+- model-registry now includes calibration/ directory with all 10 inference artifacts
+- manifest.json replaces model.json with full inference config
+- Export zip now includes weights + calibration + manifest (self-contained)
+
+### ISSUE-4 (Job scheduling): FIXED
+- Added full dispatch contract: per-worker dedicated queues, atomic job lease, idempotent start tokens
+- Late ack + reject_on_worker_lost, visibility_timeout=86400
+- Heartbeat-based offline detection (3 missed beats = 90s)
+
+### ISSUE-5 (Schema): FIXED
+- Added job_steps table with per-step status, timing, retry count, artifact paths, validity markers
+- Removed dataset_id FK from training_jobs (single-sourced via version_id)
+- Removed duplicated FKs from models table (lineage derives from job)
+- workers.current_job_id documented as denormalized convenience, source of truth is training_jobs.worker_id
+- Added queue_name to workers table
+
+### ISSUE-6 (Failure/retry/resume/cancel): FIXED
+- Added full Failure, Retry, Resume & Cancellation section
+- Per-step retry (max_retries=2), attempts tracking in job_steps
+- Resume endpoint POST /jobs/{id}/resume from last completed step
+- Cancel propagation: Celery revoke + SIGTERM + graceful shutdown
+- Artifact validity markers (completed/partial/failed)
+
+### ISSUE-7 (WebSocket logs): FIXED
+- Added Section 11: Log Streaming Architecture
+- Durable pipeline: container stdout → daemon → Redis Pub/Sub + MinIO append
+- Offset-based chunks for reconnect/backfill
+- Step-aware filtering, EOF markers
+- JWT auth via query param
+
+### ISSUE-8 (Dataset upload): FIXED
+- Changed to 3-step presigned URL upload flow
+- POST /datasets/ creates metadata only
+- POST /datasets/{id}/upload-url returns presigned MinIO PUT URL
+- POST /datasets/{id}/upload-complete triggers async Celery validation
+- Client polls GET /datasets/{id} for status
+
+### ISSUE-9 (Runtime deps): FIXED
+- Added Section 12: Runtime Dependency Policy
+- Air-gapped containers: NO internet access during training
+- All weights mirrored in MinIO or baked into Docker image
+- DINO torch.hub cache baked into image
+- Docker build contract documented
+- CI smoke test without network
+
+### ISSUE-10 (Security): FIXED
+- Added Section 13: Security
+- RBAC: owner-only datasets/jobs/models, admin-only workers
+- Upload hardening: zip bomb protection, path traversal defense, file type allowlist, size limits, rate limits
+- Container isolation: non-root, read-only rootfs, no network, GPU isolation, resource limits
+- Secret management: env vars / Docker secrets / KMS
+
+## Issues Disputed
+None. All 10 issues accepted and fixed.
+
+## Your Turn
+Re-review using the same output format. Keep prior accepted points closed unless regression exists.

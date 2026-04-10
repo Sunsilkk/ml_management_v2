@@ -1,0 +1,45 @@
+### ISSUE-1: Callback placement violates container isolation
+- Category: architecture
+- Severity: critical
+- Problem: Section 5 gives the `TrainingCallback` responsibility for Redis Pub/Sub, DB writes, MinIO uploads, and cancel polling ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L520)), Section 9 places that callback in the training image entrypoint ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L1107)), and Section 13 says training containers run with `--network=none` ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L1244)).
+- Why it matters: The primary integration path for live metrics, checkpoints, step-state updates, and cancellation cannot execute as written.
+- Suggested fix: Pick one architecture explicitly: either move the adapter outside the container and drive it from local files/IPC, or relax isolation and document the exact allowed egress targets and auth model.
+
+### ISSUE-2: Resume flow is not wired from API to checkpoint selection
+- Category: sequencing
+- Severity: high
+- Problem: Section 4 says the API passes `resume_from` into the library ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L401)), but Sections 3 and 7 only define `/resume` as “resume from last completed step” ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L160), [spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L861)), and the schemas do not store a canonical checkpoint pointer or resumed iteration ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L684), [spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L705)).
+- Why it matters: When step 4 fails after multiple checkpoints, the platform has no deterministic contract for which checkpoint to resume from.
+- Suggested fix: Add explicit resumable-checkpoint state to the plan and make `/resume` state whether step 4 resumes from the latest valid checkpoint or reruns the step from iteration 0.
+
+### ISSUE-3: “Exact reproducible” resume is not supported by the captured state
+- Category: correctness
+- Severity: high
+- Problem: The checkpoint format saves model, optimizer, scheduler, and RNG state ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L371)), but baseline SALAD training uses shuffled `DataLoader`s, `InfiniteDataloader`, stochastic augmentations, and worker processes ([train_salad.py](/Users/sunsilkk/service/ml_management_v2/Anomaly-Dectection/SALAD/train_salad.py#L169), [train_salad.py](/Users/sunsilkk/service/ml_management_v2/Anomaly-Dectection/SALAD/train_salad.py#L221), [salad_dataset.py](/Users/sunsilkk/service/ml_management_v2/Anomaly-Dectection/SALAD/salad_dataset.py#L255)).
+- Why it matters: Sampler position and worker RNG state are not preserved, so resumed runs will likely diverge in sample order and augmentation sequence despite the spec promising exact reproducibility.
+- Suggested fix: Either downgrade the guarantee to best-effort resume or specify deterministic sampler/loader checkpointing and the exact fast-forward mechanism.
+
+### ISSUE-4: Evaluation metric contract is internally inconsistent
+- Category: correctness
+- Severity: high
+- Problem: Section 4 says there are 15 AUC metrics but lists 12 ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L317)), `on_eval_end` emits `auc_combined_logical/structural` ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L355)), Section 5 says `eval.jsonl` has 15 fields ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L520)), and Section 6 stores `auc_logical/structural` columns instead ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L737)).
+- Why it matters: The library, adapter, DB writes, and charts do not share one stable schema, so evaluation reporting cannot be implemented unambiguously.
+- Suggested fix: Define one canonical evaluation payload with exact field names/counts and state whether the library computes all branch/type AUCs internally or exposes per-image branch scores for the adapter.
+
+### ISSUE-5: The config surface no longer maps cleanly to baseline SALAD or the API examples
+- Category: correctness
+- Severity: medium
+- Problem: Section 4 defines `imagenet_path` with default OFF ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L264)), Section 7 sends `imagenet_penalty` instead ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L900)), baseline SALAD enables `imagenet_train_path` by default unless set to `'none'` ([argparser.py](/Users/sunsilkk/service/ml_management_v2/Anomaly-Dectection/SALAD/argparser.py#L7), [train_salad.py](/Users/sunsilkk/service/ml_management_v2/Anomaly-Dectection/SALAD/train_salad.py#L109)), and Step 3 exposes scheduler knobs that the baseline script never actually uses ([train_composition_segmentation_model.py](/Users/sunsilkk/service/ml_management_v2/Anomaly-Dectection/SALAD/train_composition_segmentation_model.py#L97)).
+- Why it matters: The Pydantic/JSON Schema layer will generate fields whose names or effects are ambiguous, weakening the claim that the rewrite preserves SALAD behavior.
+- Suggested fix: Add a canonical parameter-mapping table for each step that marks every field as baseline-equivalent, intentional deviation, or platform-only, and align the API examples to that table.
+
+### ISSUE-6: A stale wrapper-script dependency still remains in the runtime section
+- Category: scope
+- Severity: medium
+- Problem: Section 12 still says DINO support may require a “wrapper script” and describes the wrong loading path for `create_pseudo_labels.py` ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L1201)), while the actual SALAD code loads DINO weights via `torch.hub.load_state_dict_from_url` ([modules.py](/Users/sunsilkk/service/ml_management_v2/Anomaly-Dectection/SALAD/composition_map_creation/modules.py#L25)) and the new design elsewhere is explicitly library-native ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L183), [spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L518)).
+- Why it matters: The plan still points implementers at an obsolete integration surface, which is exactly the old approach this rewrite is supposed to eliminate.
+- Suggested fix: Rewrite Section 12 around a library-native DINO checkpoint contract and remove the wrapper-script language entirely.
+
+### VERDICT
+- Status: REVISE
+- Reason: The rewritten `salad_pipeline` architecture still has unresolved contradictions in runtime integration, resume semantics, and evaluation/config contracts.

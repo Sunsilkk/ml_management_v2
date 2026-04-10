@@ -1,0 +1,31 @@
+### ISSUE-1: Artifact And Metrics Contracts Still Do Not Match The Checked SALAD Outputs
+- Category: correctness
+- Severity: high
+- Problem: The revised spec still names artifacts the current SALAD code does not actually emit. `train_salad.py` saves and `test_salad.py` loads `comp_autoencoder_final.pth`, while the spec now standardizes on `comp_ae_final.pth`. The spec also still lists `03_comp_seg_training/{... model.pth ...}`, but `train_composition_segmentation_model.py` only writes composition maps, not a model artifact. Separately, `loss.jsonl` and the per-branch charting contract are still not backed by an explicit producer in the checked scripts.
+- Why it matters: Implementers can build storage, registry, and UI code against filenames and metrics that the actual runner never produces, which reintroduces the same integration risk under a narrower surface.
+- Suggested fix: Either align the spec to the raw SALAD filenames and outputs exactly, or define one explicit adapter layer that normalizes SALAD artifacts and metrics into the canonical MinIO/DB contract.
+
+### ISSUE-2: The Calibration Bundle Is Still Ambiguous Relative To Real Inference Inputs
+- Category: correctness
+- Severity: high
+- Problem: The new `calibration/` bundle is better, but it still does not map cleanly to the variables the checked inference path actually consumes. The runtime needs multiple normalization values and Mahalanobis structures, including `q_eff_*`, `q_seg_*`, `q_start_mah`, `q_end_mah`, and segmented mean/covariance dictionaries. The spec’s current file list and `manifest.json` description do not make it unambiguous where each required value lives.
+- Why it matters: Two teams could both implement the spec and still produce incompatible “self-contained” exports, which breaks Phase 2 inference portability.
+- Suggested fix: Define the calibration serialization contract precisely, preferably as one versioned artifact or a manifest schema whose field names match the runtime variables used by inference.
+
+### ISSUE-3: The Log Storage Design Still Assumes Appendable MinIO Objects
+- Category: architecture
+- Severity: high
+- Problem: Section 11 writes log batches every second by appending to a single MinIO object per step. That is not a clean fit for MinIO’s normal versioned object semantics, where object mutations create new versions rather than incremental in-place updates ([MinIO docs](https://docs.min.io/enterprise/aistor-object-store/administration/objects-and-versioning/versioning/)).
+- Why it matters: The current design is either operationally expensive due to repeated object rewrites/version growth, or it depends on an append mechanism the spec never defines.
+- Suggested fix: Store immutable log chunks by offset, such as `logs/step_04/chunks/000001.jsonl`, and build reconnect/backfill on chunk indexes instead of repeated appends to one object.
+
+### ISSUE-4: WebSocket Authentication Still Conflicts With The Token Storage Model
+- Category: risk
+- Severity: medium
+- Problem: The security section says access tokens are stored in HttpOnly cookies, while the log-stream section requires the browser client to send a JWT in the WebSocket query string. Browser code cannot read an HttpOnly cookie to construct that URL, and query-string tokens are prone to leakage via logs, history, and intermediaries.
+- Why it matters: As written, the WebSocket auth flow is either unusable or weaker than the rest of the security model.
+- Suggested fix: Authenticate the WebSocket via same-origin cookies during upgrade, or mint a short-lived WebSocket ticket from an authenticated HTTP endpoint and pass that instead of the main JWT.
+
+### VERDICT
+- Status: REVISE
+- Reason: The major first-pass issues were addressed, but the revised spec still has unresolved contract gaps around actual SALAD artifacts, inference calibration serialization, and log-stream implementation details.

@@ -1,0 +1,32 @@
+## Issues Accepted & Fixed (Round 2 → Round 3)
+
+### ISSUE-1 (Artifact names + Step 3 output): FIXED
+- Changed comp_ae_final.pth → comp_autoencoder_final.pth everywhere (matches train_salad.py exactly)
+- Step 3 MinIO output: removed 'model.pth', now only 'composition_maps/...' (matches script output)
+- Added explicit Adapter Layer section: wrapper script converts SALAD stdout → loss.jsonl/eval.jsonl, collects calibration stats post-training
+- Added note that SALAD scripts don't natively produce structured metrics — adapter required
+
+### ISSUE-2 (Calibration bundle ambiguous): FIXED
+- Replaced 10 separate .pt files with single calibration.pt (torch dict)
+- Defined exact schema with field names, tensor shapes, and what each maps to in inference code
+- Includes: teacher_mean/std, q_st_start/end, q_ae_start/end, q_comp_start/end, mahalanobis_means (per-class dict), mahalanobis_covinvs (per-class dict), image_size, num_composition_classes
+- Added manifest.json schema with explicit file references
+
+### ISSUE-3 (MinIO append → immutable chunks): FIXED
+- Rewrote log pipeline: immutable JSONL chunk files per offset (e.g. logs/step_04/chunks/000001.jsonl)
+- Each chunk is a small versioned object (1-100KB), no mutations
+- Added chunk index.json for fast offset lookup during backfill
+- Updated MinIO directory structure to match
+
+### ISSUE-4 (WebSocket auth conflict): FIXED
+- Removed JWT query param approach entirely
+- Added short-lived ticket flow: POST /ws-ticket → single-use token (30s TTL in Redis) → passed as query param
+- Updated Security table: WebSocket row now references ticket approach
+- Added ws-ticket endpoint to API table
+- Added rationale explaining why HttpOnly + ticket is needed
+
+## Issues Disputed
+None. All 4 accepted and fixed.
+
+## Your Turn
+Re-review. Prior closed issues should stay closed unless regression.

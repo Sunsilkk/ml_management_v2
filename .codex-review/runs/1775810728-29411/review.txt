@@ -1,0 +1,66 @@
+### ISSUE-1: Orchestration model is internally inconsistent
+- Category: architecture
+- Severity: critical
+- Problem: Section 3 describes one container executing the full 4-step job and directly pulling/uploading from MinIO, while Section 4 says each step is a separate Celery task, and Sections 5/13 say the container is air-gapped and the host watcher performs all MinIO/API I/O.
+- Why it matters: Retry boundaries, worker lease duration, cancellation behavior, artifact ownership, and log flow cannot be implemented coherently until there is one authoritative execution model.
+- Suggested fix: Collapse the plan onto one explicit end-to-end control flow and update scheduling, IPC, storage, and API sections so they all describe the same execution path.
+
+### ISSUE-2: Heartbeat requeue can launch duplicate training runs
+- Category: correctness
+- Severity: critical
+- Problem: The plan re-queues jobs after 90s of missed heartbeat, but duplicate prevention is only a worker-local check for the same `idempotency_token`; another worker has no shared fence proving the original attempt is actually dead.
+- Why it matters: A transient heartbeat/API partition can produce two live executors writing checkpoints, metrics, and final artifacts for the same job.
+- Suggested fix: Introduce a cluster-wide leased run attempt with fencing semantics, lease renewal, and write authorization tied to the active attempt before any requeue is allowed.
+
+### ISSUE-3: Resume and reproducibility are not pinned to immutable runtime inputs
+- Category: correctness
+- Severity: high
+- Problem: Jobs reference mutable assets such as `salad-training:latest` and shared MinIO prerequisite paths, but the spec does not persist image digests, pipeline/library version, or prerequisite checksums with each job/model.
+- Why it matters: A resumed or re-run job may execute under different code or weights than the original attempt, making auditability, debugging, and checkpoint compatibility unreliable.
+- Suggested fix: Require an immutable runtime manifest at job creation, including image digest, pipeline schema version, prerequisite checksums, and dataset version fingerprint, and carry that manifest into the model registry.
+
+### ISSUE-4: Durable ingestion is not idempotent
+- Category: correctness
+- Severity: high
+- Problem: `training_metrics` and `training_evaluations` only define non-unique indexes, while the watcher explicitly retries uploads and can restart mid-stream; the log chunk flow likewise lacks an idempotency key per offset/chunk.
+- Why it matters: Duplicate inserts will corrupt charts, comparisons, and resume views, and the failures will look like data bugs instead of infrastructure bugs.
+- Suggested fix: Add explicit uniqueness/idempotency rules for metrics, evaluations, and log chunks, and define internal endpoints as upsert-or-reject rather than blind append.
+
+### ISSUE-5: Model registry promotion semantics are undefined
+- Category: correctness
+- Severity: high
+- Problem: The plan stores one registry model per successful job and writes `*_final.pth`, but the job also evaluates multiple checkpoints and never states whether registry metrics come from the final checkpoint, the best checkpoint, or both.
+- Why it matters: The platform can report one set of AUCs while exporting a different set of weights, which breaks trust in comparison and deployment decisions.
+- Suggested fix: Define a single promotion policy for Phase 1, record the selected checkpoint iteration in the registry manifest, and make reported metrics explicitly reference that chosen artifact.
+
+### ISSUE-6: Dataset and artifact retention rules are missing
+- Category: risk
+- Severity: high
+- Problem: The API allows dataset deletion, and the storage section says old job artifacts may be cleaned up, but the plan does not define what happens when queued/running jobs, resume checkpoints, or registered models still depend on those assets.
+- Why it matters: Lineage, reproducibility, and resume can be broken by routine cleanup or deletion.
+- Suggested fix: Add lifecycle rules for datasets, dataset versions, job artifacts, checkpoints, and registry bundles, including delete preconditions, soft-delete behavior, and retention ownership.
+
+### ISSUE-7: Worker admission ignores local staging capacity
+- Category: risk
+- Severity: high
+- Problem: Scheduling only reasons about GPU occupancy, yet each job stages decompressed datasets, pretrained weights, optional ImageNet data, checkpoints, and logs on local `/workspace`.
+- Why it matters: A worker can accept a job that fits GPU memory but exhausts disk, tmpfs, or `/dev/shm`, causing late failures after hours of compute.
+- Suggested fix: Add a non-GPU admission model with preflight estimates and reservations for disk, shared memory, CPU/RAM, and checkpoint growth before leasing a worker.
+
+### ISSUE-8: Control-plane authorization is underspecified
+- Category: risk
+- Severity: high
+- Problem: Internal endpoints rely on `X-Worker-Token`, but the schema does not actually include worker credential storage, and the plan never states that a worker may mutate only the job currently leased to it.
+- Why it matters: A buggy or compromised worker daemon can update arbitrary jobs/steps, making cross-worker state corruption possible.
+- Suggested fix: Extend the plan with worker credential fields and explicit authorization rules that bind every internal mutation to both worker identity and current lease ownership.
+
+### ISSUE-9: The schema still does not support several declared workflows
+- Category: sequencing
+- Severity: medium
+- Problem: The dataset upload flow depends on dataset-level statuses such as `pending_upload`, `ready`, and `failed`, but the `datasets` table does not include a status field; similar control-plane fields are referenced elsewhere without schema support.
+- Why it matters: Core Phase 1 flows cannot be implemented exactly as specified, so behavior will be invented during implementation.
+- Suggested fix: Run a full schema-to-endpoint consistency pass and add every state/credential field that the API and UI flows already depend on before treating the plan as implementation-ready.
+
+### VERDICT
+- Status: REVISE
+- Reason: The plan is directionally strong, but the execution model, duplicate-run safety, reproducibility contract, and operational data invariants are not yet tight enough for implementation.

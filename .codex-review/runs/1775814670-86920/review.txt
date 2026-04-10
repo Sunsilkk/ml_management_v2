@@ -1,0 +1,10 @@
+### ISSUE-1: Two stale references still contradict the finalized execution/storage model
+- Category: architecture
+- Severity: medium
+- Problem: The spec still contains two pre-fix statements that conflict with the final model: the Section 4 example comment still says the platform calls an individual step via a separate Celery task, and the dispatch contract still says active-attempt artifacts are promoted to canonical paths including `training-jobs/{job_id}/final/`, even though the storage tree now makes mutable artifacts attempt-scoped and promotion target the registry.
+- Why it matters: These are small, but they reintroduce ambiguity in the exact orchestration and storage contract the implementation should follow.
+- Suggested fix: Remove the stale per-step Celery example wording and align the promotion sentence with the final attempt-scoped storage tree and registry-only promotion model.
+
+### VERDICT
+- Status: REVISE
+- Reason: The plan is effectively converged, but it still has two lingering contradictory references that should be cleaned up before approval.

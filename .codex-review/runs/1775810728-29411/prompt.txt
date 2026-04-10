@@ -1,0 +1,40 @@
+## Your Role
+You are Codex acting as a strict implementation-plan reviewer.
+
+## Plan Location
+/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md
+
+## User's Original Request
+This is a design spec for an ML Training Platform (Phase 1) focused on SALAD anomaly detection pipeline. The system manages dataset upload, training orchestration on remote GPU servers via Docker containers, live monitoring, model registry, and worker management. The design uses FastAPI + PostgreSQL + Celery + Redis + MinIO. A previous ChatGPT review scored it 8.8/10 with specific issues around Celery long-running job risks, state machine gaps, worker state source-of-truth, resume scope, JSONB vs typed columns, dataset validation, config validation, model lineage denormalization, log source duplication, and Phase 1 UI scope.
+
+## Session Context
+- This is a greenfield project (ml_management_v2) separate from an existing prototype (ml_management)
+- The existing prototype uses ClearML for orchestration; this new design replaces ClearML with self-hosted Celery + Docker
+- SALAD is a 4-step anomaly detection pipeline: (1) foreground masks via SAM, (2) pseudo-labels via DINO+KMeans+SAM-HQ, (3) composition segmentation UNet training, (4) SALAD training (teacher-student + autoencoder + composition branch)
+- Training containers run with --network=none for security; IPC via shared filesystem
+- The design includes a rewrite of SALAD research scripts into a production library (salad_pipeline/)
+- Key architecture: 2-machine setup (App Server + GPU Server), worker daemon manages Docker containers
+- A ChatGPT review already identified 10 major issues and gave specific recommendations. Your job is to find issues that ChatGPT MISSED or disagree with ChatGPT's assessment where appropriate.
+
+## Additional Context from ChatGPT Review
+The ChatGPT review (8.8/10) praised: Phase 1 scope, SALAD rewrite, IPC design, per-step model, MinIO structure, callback contract, operational failure thinking. It flagged: Celery risks for long-running jobs, insufficient job status states, worker state source-of-truth, resume scope, JSONB metrics, dataset schema gaps, loose config validation, model lineage denormalization, log source duplication, Phase 1 UI scope. Your review should go DEEPER than this and find what ChatGPT missed.
+
+## Instructions
+1. Read the plan file directly at /Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md.
+2. Identify gaps, risks, missing edge cases, and sequencing flaws. Focus on issues ChatGPT MISSED.
+3. Do not propose code changes; review only the plan quality.
+4. Use the required output format exactly.
+
+## Required Output Format
+Use this exact shape:
+
+### ISSUE-{N}: {Short title}
+- Category: correctness | architecture | sequencing | risk | scope
+- Severity: low | medium | high | critical
+- Problem: {clear statement}
+- Why it matters: {impact}
+- Suggested fix: {plan-level change}
+
+### VERDICT
+- Status: APPROVE | REVISE
+- Reason: {short reason}

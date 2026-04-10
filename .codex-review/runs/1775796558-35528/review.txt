@@ -1,0 +1,31 @@
+### ISSUE-1: Stale direct-callback contract still contradicts the IPC design
+- Category: architecture
+- Severity: high
+- Problem: Section 5 now defines a file-based `FilesystemCallback` plus host-side IPC watcher ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L557)), but Section 4 still says the platform callback writes MinIO/Redis directly and checks Redis for cancellation ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L401)), and Section 6 still says the adapter computes branch/type AUCs even though Section 4 says the library computes all 12 internally ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L349), [spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L830)).
+- Why it matters: The boundary between library, in-container callback, and host-side adapter is still ambiguous, so different implementers could build incompatible behavior.
+- Suggested fix: Remove the stale Section 4 callback bullets and align Sections 4, 5, and 6 to one ownership model: library computes the 12 metrics, the in-container callback only writes IPC artifacts, and the host watcher only forwards them.
+
+### ISSUE-2: `last_checkpoint_path` still has no producer in the runtime flow
+- Category: sequencing
+- Severity: high
+- Problem: Resume now depends on `job_steps.last_checkpoint_path` ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L163), [spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L791)), but the watcher flow only says “upload checkpoints → MinIO” ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L590)) and never states who updates that column, when it is updated, or whether it is written only after a successful upload.
+- Why it matters: The resume endpoint still lacks authoritative checkpoint metadata and can race against failed or partial checkpoint uploads.
+- Suggested fix: Add an explicit rule that the worker daemon updates `job_steps.last_checkpoint_path` only after the corresponding checkpoint upload succeeds, and define what happens on upload failure, cancellation, and superseded checkpoints.
+
+### ISSUE-3: The IPC handoff still lacks completion semantics
+- Category: sequencing
+- Severity: medium
+- Problem: The container writes checkpoints and final artifacts into `/workspace/ipc/`, and the watcher reacts via `inotify`/polling ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L559), [spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L590)), but the spec does not define any atomic rename, `.done` marker, or other signal that a file or directory is complete.
+- Why it matters: The daemon can parse truncated JSONL lines or upload half-written checkpoint/final directories, which directly weakens metrics integrity and resume safety.
+- Suggested fix: Specify an atomic IPC contract, such as write-to-temp then rename, or per-artifact ready markers that the watcher must wait for before forwarding.
+
+### ISSUE-4: The `composition_maps` example still violates the SALAD filesystem contract
+- Category: correctness
+- Severity: medium
+- Problem: Section 5 still shows `composition_maps/{category}/validation/{good,logical,structural}` and `test/{good,logical,structural}` ([spec](/Users/sunsilkk/service/ml_management_v2/docs/specs/2026-04-10-ml-training-platform-design.md#L513)), but baseline SALAD expects `validation/good` and exact test folder names `logical_anomalies` and `structural_anomalies` ([train_salad.py](/Users/sunsilkk/service/ml_management_v2/Anomaly-Dectection/SALAD/train_salad.py#L126), [train_composition_segmentation_model.py](/Users/sunsilkk/service/ml_management_v2/Anomaly-Dectection/SALAD/train_composition_segmentation_model.py#L152)).
+- Why it matters: Implementing the storage layout literally from the spec would break the loader contract that Step 3 and Step 4 are supposed to preserve.
+- Suggested fix: Replace the shorthand with literal directory names and keep validation as `validation/good/` only, or clearly mark the example as illustrative and define the exact normative paths elsewhere.
+
+### VERDICT
+- Status: REVISE
+- Reason: The rewrite is closer, but the callback/metric ownership, checkpoint metadata flow, IPC completion rules, and composition-map path contract are still not fully consistent.
